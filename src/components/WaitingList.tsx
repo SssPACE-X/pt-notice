@@ -1,0 +1,126 @@
+"use client";
+
+import { useState } from "react";
+import { supabase } from "@/lib/supabase";
+import AssignModal from "./AssignModal";
+
+interface Patient {
+    id: string;
+    reg_no: string;
+    name: string;
+}
+
+export default function WaitingList({ patients }: { patients: Patient[] }) {
+    const [assigningPatient, setAssigningPatient] = useState<Patient | null>(null);
+
+    const handleDelete = async (id: string) => {
+        if (confirm("정말로 이 환자를 완전히 삭제하시겠습니까? (DB에서 삭제됩니다)")) {
+            await supabase.from("patients").delete().eq("id", id);
+        }
+    };
+
+    const handleEdit = () => {
+        alert("수정 기능은 환자 이름이나 등록번호를 변경하는 데 사용됩니다. (기본 UI 연동)");
+        // MVP에서는 일단 삭제 후 재등록 안내 혹은 생략, 요구사항 상 버튼은 있어야 함
+    };
+
+    return (
+        <div style={styles.container}>
+            <h2 style={styles.title}>대기 명단</h2>
+            {patients.length === 0 ? (
+                <p style={styles.empty}>대기 중인 환자가 없습니다.</p>
+            ) : (
+                <ul style={styles.list}>
+                    {patients.map(p => (
+                        <li key={p.id} style={styles.listItem}>
+                            <div style={styles.info}>
+                                <span style={styles.regNo}>{p.reg_no}</span>
+                                <span style={styles.name}>{p.name}</span>
+                            </div>
+                            <div style={styles.actions}>
+                                <button className="btn-primary" style={styles.btnAssign} onClick={() => setAssigningPatient(p)}>배정</button>
+                                <button className="btn-secondary" style={styles.btnEdit} onClick={handleEdit}>수정</button>
+                                <button className="btn-secondary" style={styles.btnDelete} onClick={() => handleDelete(p.id)}>삭제</button>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {assigningPatient && (
+                <AssignModal
+                    patient={assigningPatient}
+                    onClose={() => setAssigningPatient(null)}
+                />
+            )}
+        </div>
+    );
+}
+
+const styles = {
+    container: {
+        backgroundColor: "var(--card-bg)",
+        borderRadius: "12px",
+        padding: "1.5rem",
+        boxShadow: "0 4px 6px rgba(0,0,0,0.02)",
+        marginBottom: "2rem"
+    },
+    title: {
+        fontSize: "1.2rem",
+        marginBottom: "1rem",
+        paddingBottom: "0.5rem",
+        borderBottom: "2px solid var(--border-color)",
+    },
+    list: {
+        listStyle: "none",
+        padding: 0,
+        margin: 0,
+        display: "flex",
+        flexDirection: "column" as const,
+        gap: "0.5rem"
+    },
+    listItem: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "0.75rem",
+        backgroundColor: "var(--bg-color)",
+        borderRadius: "8px",
+    },
+    info: {
+        display: "flex",
+        gap: "1rem",
+        alignItems: "center",
+    },
+    regNo: {
+        fontFamily: "monospace",
+        color: "var(--text-muted)",
+        fontSize: "0.9rem"
+    },
+    name: {
+        fontWeight: "bold",
+        fontSize: "1.1rem"
+    },
+    actions: {
+        display: "flex",
+        gap: "0.5rem"
+    },
+    btnAssign: {
+        padding: "0.3rem 0.6rem",
+        fontSize: "0.85rem"
+    },
+    btnEdit: {
+        padding: "0.3rem 0.6rem",
+        fontSize: "0.85rem",
+    },
+    btnDelete: {
+        padding: "0.3rem 0.6rem",
+        fontSize: "0.85rem",
+        color: "var(--danger)"
+    },
+    empty: {
+        color: "var(--text-muted)",
+        textAlign: "center" as const,
+        padding: "2rem 0"
+    }
+};
