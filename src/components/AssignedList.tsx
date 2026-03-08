@@ -12,7 +12,17 @@ interface Patient {
     diagnosis: string | null;
     schedule: string | null;
     status?: string;
+    infection_status?: string | null;
 }
+
+// 감염 상태 순환: none → contact → airborne → blood → none
+const INFECTION_CYCLE = ["none", "contact", "airborne", "blood"] as const;
+const INFECTION_EMOJI: Record<string, string> = {
+    none: "",
+    contact: "🧤",
+    airborne: "😷",
+    blood: "🩸",
+};
 
 interface TreatmentCheck {
     id: string;
@@ -50,6 +60,7 @@ function PatientRow({
     onReassign,
     onUpdatePatient,
     onUpdateReason,
+    onUpdateInfection,
 }: {
     patient: Patient;
     check: TreatmentCheck | undefined;
@@ -58,6 +69,7 @@ function PatientRow({
     onReassign: (p: Patient) => void;
     onUpdatePatient: (id: string, field: "ward_room" | "diagnosis", value: string) => void;
     onUpdateReason: (checkId: string, reason: string) => void;
+    onUpdateInfection: (id: string, status: string) => void;
 }) {
     const [wardRoom, setWardRoom] = useState(patient.ward_room || "");
     const [diagnosis, setDiagnosis] = useState(patient.diagnosis || "");
@@ -97,7 +109,21 @@ function PatientRow({
                     {state === "done" ? "V" : state === "missed" ? "X" : ""}
                 </div>
 
-                {/* 2. 이름 (클릭 시 재배정) */}
+                {/* 2. 감염 상태 이모지 토글 */}
+                <div
+                    style={styles.infectionBtn}
+                    onClick={() => {
+                        const current = patient.infection_status || "none";
+                        const idx = INFECTION_CYCLE.indexOf(current as any);
+                        const next = INFECTION_CYCLE[(idx + 1) % INFECTION_CYCLE.length];
+                        onUpdateInfection(patient.id, next);
+                    }}
+                    title="감염 상태 (접촉/호흡/혈액)"
+                >
+                    {INFECTION_EMOJI[patient.infection_status || "none"] || "⚪"}
+                </div>
+
+                {/* 3. 이름 (클릭 시 재배정) */}
                 <div
                     style={styles.name}
                     onClick={() => onReassign(patient)}
@@ -198,6 +224,10 @@ export default function AssignedList({ title, scheduleKey, patients, checks }: A
         await supabase.from("patients").update({ [field]: value }).eq("id", patientId);
     };
 
+    const handleUpdateInfection = async (patientId: string, status: string) => {
+        await supabase.from("patients").update({ infection_status: status }).eq("id", patientId);
+    };
+
     const handleUpdateReason = async (checkId: string, reason: string) => {
         await supabase.from("treatment_checks").update({ missed_reason: reason }).eq("id", checkId);
     };
@@ -222,6 +252,7 @@ export default function AssignedList({ title, scheduleKey, patients, checks }: A
                             onReassign={setReassigningPatient}
                             onUpdatePatient={handleUpdatePatient}
                             onUpdateReason={handleUpdateReason}
+                            onUpdateInfection={handleUpdateInfection}
                         />
                     );
                 })}
@@ -298,6 +329,21 @@ const styles = {
         backgroundColor: "var(--danger)",
         borderColor: "var(--danger)",
         color: "#fff"
+    },
+    infectionBtn: {
+        width: "28px",
+        height: "28px",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        fontSize: "1.1rem",
+        cursor: "pointer",
+        userSelect: "none" as const,
+        borderRadius: "50%",
+        backgroundColor: "#f1f5f9",
+        border: "1px solid var(--border-color)",
+        transition: "transform 0.15s",
+        flexShrink: 0,
     },
     name: {
         fontWeight: "bold",
