@@ -38,11 +38,11 @@ export default function DischargeList({ patients }: { patients: Patient[] }) {
             <ul style={styles.list}>
                 {validPatients.map(p => (
                     <li key={p.id} style={styles.listItem}>
-                        <div style={styles.info}>
+                        <div style={styles.topRow}>
                             <span style={styles.regNo}>{p.reg_no}</span>
                             <span style={styles.name}>{p.name}</span>
                         </div>
-                        <div style={styles.actions}>
+                        <div style={styles.bottomRow}>
                             <button className="btn-secondary" onClick={() => setReassigningPatient(p)}>재배정</button>
                             <div style={styles.dateInfo}>
                                 {new Date(p.discharged_at!).toLocaleDateString()} D/C
@@ -89,39 +89,33 @@ const styles = {
     },
     listItem: {
         display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
+        flexDirection: "column" as const,
         padding: "0.75rem",
         backgroundColor: "var(--bg-color)",
         borderRadius: "8px",
         gap: "0.5rem",
-        overflow: "hidden" as const,
     },
-    info: {
+    topRow: {
         display: "flex",
-        gap: "0.5rem",
+        gap: "0.75rem",
         alignItems: "center",
-        minWidth: 0,
-        overflow: "hidden" as const,
     },
     regNo: {
         fontFamily: "monospace",
         color: "var(--text-muted)",
-        fontSize: "0.9rem"
+        fontSize: "0.9rem",
+        flexShrink: 0,
     },
     name: {
         fontWeight: "bold",
         fontSize: "1.1rem",
         color: "var(--text-muted)",
-        whiteSpace: "nowrap" as const,
-        overflow: "hidden" as const,
-        textOverflow: "ellipsis" as const,
     },
-    actions: {
+    bottomRow: {
         display: "flex",
         gap: "0.5rem",
         alignItems: "center",
-        flexShrink: 0,
+        justifyContent: "flex-end" as const,
     },
     dateInfo: {
         fontSize: "0.85rem",
