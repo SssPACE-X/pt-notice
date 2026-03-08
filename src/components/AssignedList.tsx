@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import AssignModal from "./AssignModal";
 
@@ -11,6 +11,7 @@ interface Patient {
     ward_room: string | null;
     diagnosis: string | null;
     schedule: string | null;
+    status?: string;
 }
 
 interface TreatmentCheck {
@@ -38,6 +39,114 @@ function getShiftDate() {
     const kstOffset = 9 * 60 * 60 * 1000;
     const kstDate = new Date(now.getTime() + kstOffset);
     return kstDate.toISOString().split("T")[0];
+}
+
+/* ── 개별 환자 행 (controlled inputs) ── */
+function PatientRow({
+    patient,
+    check,
+    state,
+    onCheckboxClick,
+    onReassign,
+    onUpdatePatient,
+    onUpdateReason,
+}: {
+    patient: Patient;
+    check: TreatmentCheck | undefined;
+    state: "none" | "done" | "missed";
+    onCheckboxClick: (id: string) => void;
+    onReassign: (p: Patient) => void;
+    onUpdatePatient: (id: string, field: "ward_room" | "diagnosis", value: string) => void;
+    onUpdateReason: (checkId: string, reason: string) => void;
+}) {
+    const [wardRoom, setWardRoom] = useState(patient.ward_room || "");
+    const [diagnosis, setDiagnosis] = useState(patient.diagnosis || "");
+    const [missedReason, setMissedReason] = useState(check?.missed_reason || "");
+
+    const wardRef = useRef<HTMLInputElement>(null);
+    const diagRef = useRef<HTMLInputElement>(null);
+    const reasonRef = useRef<HTMLInputElement>(null);
+
+    // props 변경 시 로컬 state 동기화 (focus 중이 아닐 때만)
+    useEffect(() => {
+        if (document.activeElement !== wardRef.current) {
+            setWardRoom(patient.ward_room || "");
+        }
+    }, [patient.ward_room]);
+
+    useEffect(() => {
+        if (document.activeElement !== diagRef.current) {
+            setDiagnosis(patient.diagnosis || "");
+        }
+    }, [patient.diagnosis]);
+
+    useEffect(() => {
+        if (document.activeElement !== reasonRef.current) {
+            setMissedReason(check?.missed_reason || "");
+        }
+    }, [check?.missed_reason]);
+
+    return (
+        <li style={styles.card}>
+            <div style={styles.mainRow}>
+                {/* 1. 체크박스 영역 */}
+                <div
+                    style={{ ...styles.checkbox, ...(state === "done" ? styles.checkV : state === "missed" ? styles.checkX : {}) }}
+                    onClick={() => onCheckboxClick(patient.id)}
+                >
+                    {state === "done" ? "V" : state === "missed" ? "X" : ""}
+                </div>
+
+                {/* 2. 이름 (클릭 시 재배정) */}
+                <div
+                    style={styles.name}
+                    onClick={() => onReassign(patient)}
+                >
+                    {patient.name}
+                </div>
+
+                {/* 3. 병동/호실 */}
+                <input
+                    ref={wardRef}
+                    value={wardRoom}
+                    onChange={(e) => setWardRoom(e.target.value)}
+                    placeholder="병동.호실 (ex 76.01)"
+                    inputMode="decimal"
+                    onBlur={(e) => {
+                        const val = e.target.value.replace(/[^0-9.]/g, '');
+                        setWardRoom(val);
+                        onUpdatePatient(patient.id, "ward_room", val);
+                    }}
+                    style={styles.wardInput}
+                />
+
+                {/* 4. 질환명 */}
+                <input
+                    ref={diagRef}
+                    value={diagnosis}
+                    onChange={(e) => setDiagnosis(e.target.value)}
+                    placeholder="질환명 입력"
+                    onBlur={(e) => onUpdatePatient(patient.id, "diagnosis", e.target.value)}
+                    style={styles.diagInput}
+                />
+            </div>
+
+            {/* X 상태 시 사유 입력란 등장 */}
+            {state === "missed" && check && (
+                <div style={styles.reasonRow} className="animate-fade-in">
+                    <span style={styles.reasonLabel}>↳ 미시행 사유:</span>
+                    <input
+                        ref={reasonRef}
+                        value={missedReason}
+                        onChange={(e) => setMissedReason(e.target.value)}
+                        placeholder="사유를 입력하세요 (예: 거부, 외출 등)"
+                        onBlur={(e) => onUpdateReason(check.id, e.target.value)}
+                        style={styles.reasonInput}
+                    />
+                </div>
+            )}
+        </li>
+    );
 }
 
 export default function AssignedList({ title, scheduleKey, patients, checks }: AssignedListProps) {
@@ -104,60 +213,16 @@ export default function AssignedList({ title, scheduleKey, patients, checks }: A
                     const state = check?.check_state || "none";
 
                     return (
-                        <li key={p.id} style={styles.card}>
-                            <div style={styles.mainRow}>
-                                {/* 1. 체크박스 영역 */}
-                                <div
-                                    style={{ ...styles.checkbox, ...(state === "done" ? styles.checkV : state === "missed" ? styles.checkX : {}) }}
-                                    onClick={() => handleCheckboxClick(p.id)}
-                                >
-                                    {state === "done" ? "V" : state === "missed" ? "X" : ""}
-                                </div>
-
-                                {/* 2. 이름 (클릭 시 재배정) */}
-                                <div
-                                    style={styles.name}
-                                    onClick={() => setReassigningPatient(p)}
-                                >
-                                    {p.name}
-                                </div>
-
-                                {/* 3. 병동/호실 */}
-                                <input
-                                    defaultValue={p.ward_room || ""}
-                                    placeholder="병동.호실 (ex 76.01)"
-                                    pattern="[0-9.]+"
-                                    onBlur={(e) => {
-                                        // 입력값 숫자/점만 필터링 저장
-                                        const val = e.target.value.replace(/[^0-9.]/g, '');
-                                        e.target.value = val;
-                                        handleUpdatePatient(p.id, "ward_room", val)
-                                    }}
-                                    style={styles.wardInput}
-                                />
-
-                                {/* 4. 질환명 */}
-                                <input
-                                    defaultValue={p.diagnosis || ""}
-                                    placeholder="질환명 입력"
-                                    onBlur={(e) => handleUpdatePatient(p.id, "diagnosis", e.target.value)}
-                                    style={styles.diagInput}
-                                />
-                            </div>
-
-                            {/* X 상태 시 사유 입력란 등장 */}
-                            {state === "missed" && check && (
-                                <div style={styles.reasonRow} className="animate-fade-in">
-                                    <span style={styles.reasonLabel}>↳ 미시행 사유:</span>
-                                    <input
-                                        defaultValue={check.missed_reason || ""}
-                                        placeholder="사유를 입력하세요 (예: 거부, 외출 등)"
-                                        onBlur={(e) => handleUpdateReason(check.id, e.target.value)}
-                                        style={styles.reasonInput}
-                                    />
-                                </div>
-                            )}
-                        </li>
+                        <PatientRow
+                            key={p.id}
+                            patient={p}
+                            check={check}
+                            state={state}
+                            onCheckboxClick={handleCheckboxClick}
+                            onReassign={setReassigningPatient}
+                            onUpdatePatient={handleUpdatePatient}
+                            onUpdateReason={handleUpdateReason}
+                        />
                     );
                 })}
             </ul>

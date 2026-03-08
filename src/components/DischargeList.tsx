@@ -94,11 +94,15 @@ const styles = {
         padding: "0.75rem",
         backgroundColor: "var(--bg-color)",
         borderRadius: "8px",
+        gap: "0.5rem",
+        overflow: "hidden" as const,
     },
     info: {
         display: "flex",
-        gap: "1rem",
+        gap: "0.5rem",
         alignItems: "center",
+        minWidth: 0,
+        overflow: "hidden" as const,
     },
     regNo: {
         fontFamily: "monospace",
@@ -108,12 +112,16 @@ const styles = {
     name: {
         fontWeight: "bold",
         fontSize: "1.1rem",
-        color: "var(--text-muted)"
+        color: "var(--text-muted)",
+        whiteSpace: "nowrap" as const,
+        overflow: "hidden" as const,
+        textOverflow: "ellipsis" as const,
     },
     actions: {
         display: "flex",
-        gap: "1rem",
-        alignItems: "center"
+        gap: "0.5rem",
+        alignItems: "center",
+        flexShrink: 0,
     },
     dateInfo: {
         fontSize: "0.85rem",

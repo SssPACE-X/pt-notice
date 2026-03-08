@@ -4,7 +4,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 interface AssignModalProps {
-    patient: { id: string; name: string; schedule?: string | null };
+    patient: { id: string; name: string; schedule?: string | null; status?: string };
     onClose: () => void;
     isReassign?: boolean;
 }
@@ -38,6 +38,30 @@ export default function AssignModal({ patient, onClose, isReassign = false }: As
         }
     };
 
+    const handleWaiting = async () => {
+        setIsSubmitting(true);
+        try {
+            const { error } = await supabase
+                .from("patients")
+                .update({
+                    status: "waiting",
+                    schedule: null,
+                    assigned_at: null,
+                    discharged_at: null
+                })
+                .eq("id", patient.id);
+            if (error) throw error;
+            onClose();
+        } catch (err) {
+            console.error("Return to waiting error", err);
+            alert("대기 명단 복구 중 오류가 발생했습니다.");
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const isAlreadyWaiting = patient.status === "waiting";
+
     return (
         <div style={styles.overlay}>
             <div style={styles.modal} className="animate-fade-in">
@@ -65,6 +89,13 @@ export default function AssignModal({ patient, onClose, isReassign = false }: As
                         disabled={isSubmitting || patient.schedule === "dc"}
                     >
                         D/C 명단
+                    </button>
+                    <button
+                        style={{ ...styles.btn, backgroundColor: "#f59e0b", color: "#fff", ...(isAlreadyWaiting ? { opacity: 0.4 } : {}) }}
+                        onClick={handleWaiting}
+                        disabled={isSubmitting || isAlreadyWaiting}
+                    >
+                        대기 명단
                     </button>
                 </div>
                 <div style={{ marginTop: "1.5rem", textAlign: "right" }}>
