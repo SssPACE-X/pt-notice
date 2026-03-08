@@ -19,9 +19,27 @@ export default function WaitingList({ patients }: { patients: Patient[] }) {
         }
     };
 
-    const handleEdit = () => {
-        alert("수정 기능은 환자 이름이나 등록번호를 변경하는 데 사용됩니다. (기본 UI 연동)");
-        // MVP에서는 일단 삭제 후 재등록 안내 혹은 생략, 요구사항 상 버튼은 있어야 함
+    const handleEdit = async (p: Patient) => {
+        const newName = prompt("환자 이름 수정:", p.name);
+        if (newName === null) return; // 취소
+        const newRegNo = prompt("등록번호 수정:", p.reg_no);
+        if (newRegNo === null) return; // 취소
+
+        if (!newName.trim() || !newRegNo.trim()) {
+            alert("이름과 등록번호는 비워둘 수 없습니다.");
+            return;
+        }
+
+        try {
+            const { error } = await supabase
+                .from("patients")
+                .update({ name: newName.trim(), reg_no: newRegNo.trim() })
+                .eq("id", p.id);
+            if (error) throw error;
+        } catch (err) {
+            console.error("Edit error", err);
+            alert("수정 중 오류가 발생했습니다.");
+        }
     };
 
     return (
@@ -39,7 +57,7 @@ export default function WaitingList({ patients }: { patients: Patient[] }) {
                             </div>
                             <div style={styles.actions}>
                                 <button className="btn-primary" style={styles.btnAssign} onClick={() => setAssigningPatient(p)}>배정</button>
-                                <button className="btn-secondary" style={styles.btnEdit} onClick={handleEdit}>수정</button>
+                                <button className="btn-secondary" style={styles.btnEdit} onClick={() => handleEdit(p)}>수정</button>
                                 <button className="btn-secondary" style={styles.btnDelete} onClick={() => handleDelete(p.id)}>삭제</button>
                             </div>
                         </li>
