@@ -5,11 +5,13 @@ import { supabase } from "@/lib/supabase";
 
 interface PatientModalProps {
     onClose: () => void;
+    editPatient?: { id: string; name: string; reg_no: string } | null;
 }
 
-export default function PatientModal({ onClose }: PatientModalProps) {
-    const [name, setName] = useState("");
-    const [regNo, setRegNo] = useState("");
+export default function PatientModal({ onClose, editPatient }: PatientModalProps) {
+    const isEdit = !!editPatient;
+    const [name, setName] = useState(editPatient?.name || "");
+    const [regNo, setRegNo] = useState(editPatient?.reg_no || "");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -29,27 +31,44 @@ export default function PatientModal({ onClose }: PatientModalProps) {
 
         setIsSubmitting(true);
         try {
-            const { error } = await supabase.from("patients").insert([
-                { name, reg_no: regNo, status: "waiting" }
-            ]);
+            if (isEdit && editPatient) {
+                // 수정 모드
+                const { error } = await supabase.from("patients").update(
+                    { name, reg_no: regNo }
+                ).eq("id", editPatient.id);
 
-            if (error) {
-                if (error.code === '23505') { // unique violation
-                    alert("이미 존재하는 등록번호입니다.");
+                if (error) {
+                    if (error.code === '23505') {
+                        alert("이미 존재하는 등록번호입니다.");
+                    } else {
+                        throw error;
+                    }
                 } else {
-                    throw error;
+                    onClose();
                 }
             } else {
-                // Trigger push notification to admins
-                await fetch("/api/push/notify", {
-                    method: "POST",
-                    body: JSON.stringify({
-                        title: "신규 환자 등록",
-                        body: `${name} 환자가 대기 명단에 등록되었습니다.`,
-                    }),
-                    headers: { "Content-Type": "application/json" }
-                });
-                onClose();
+                // 등록 모드
+                const { error } = await supabase.from("patients").insert([
+                    { name, reg_no: regNo, status: "waiting" }
+                ]);
+
+                if (error) {
+                    if (error.code === '23505') {
+                        alert("이미 존재하는 등록번호입니다.");
+                    } else {
+                        throw error;
+                    }
+                } else {
+                    await fetch("/api/push/notify", {
+                        method: "POST",
+                        body: JSON.stringify({
+                            title: "신규 환자 등록",
+                            body: `${name} 환자가 대기 명단에 등록되었습니다.`,
+                        }),
+                        headers: { "Content-Type": "application/json" }
+                    });
+                    onClose();
+                }
             }
         } catch (error) {
             console.error("Error registering patient:", error);
@@ -67,7 +86,7 @@ export default function PatientModal({ onClose }: PatientModalProps) {
     return (
         <div style={styles.overlay}>
             <div style={styles.modal} className="animate-fade-in">
-                <h2 style={styles.title}>환자 등록</h2>
+                <h2 style={styles.title}>{isEdit ? "환자 수정" : "환자 등록"}</h2>
                 <form onSubmit={handleSubmit}>
                     <div style={styles.formGroup}>
                         <label style={styles.label}>성함</label>
@@ -99,7 +118,7 @@ export default function PatientModal({ onClose }: PatientModalProps) {
                             취소
                         </button>
                         <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                            {isSubmitting ? "등록 중..." : "등록"}
+                            {isSubmitting ? (isEdit ? "수정 중..." : "등록 중...") : (isEdit ? "수정" : "등록")}
                         </button>
                     </div>
                 </form>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import AssignModal from "./AssignModal";
+import PatientModal from "./PatientModal";
 
 interface Patient {
     id: string;
@@ -12,33 +13,11 @@ interface Patient {
 
 export default function WaitingList({ patients }: { patients: Patient[] }) {
     const [assigningPatient, setAssigningPatient] = useState<Patient | null>(null);
+    const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
     const handleDelete = async (id: string) => {
         if (confirm("정말로 이 환자를 완전히 삭제하시겠습니까? (DB에서 삭제됩니다)")) {
             await supabase.from("patients").delete().eq("id", id);
-        }
-    };
-
-    const handleEdit = async (p: Patient) => {
-        const newName = prompt("환자 이름 수정:", p.name);
-        if (newName === null) return; // 취소
-        const newRegNo = prompt("등록번호 수정:", p.reg_no);
-        if (newRegNo === null) return; // 취소
-
-        if (!newName.trim() || !newRegNo.trim()) {
-            alert("이름과 등록번호는 비워둘 수 없습니다.");
-            return;
-        }
-
-        try {
-            const { error } = await supabase
-                .from("patients")
-                .update({ name: newName.trim(), reg_no: newRegNo.trim() })
-                .eq("id", p.id);
-            if (error) throw error;
-        } catch (err) {
-            console.error("Edit error", err);
-            alert("수정 중 오류가 발생했습니다.");
         }
     };
 
@@ -57,7 +36,7 @@ export default function WaitingList({ patients }: { patients: Patient[] }) {
                             </div>
                             <div style={styles.actions}>
                                 <button className="btn-primary" style={styles.btnAssign} onClick={() => setAssigningPatient(p)}>배정</button>
-                                <button className="btn-secondary" style={styles.btnEdit} onClick={() => handleEdit(p)}>수정</button>
+                                <button className="btn-secondary" style={styles.btnEdit} onClick={() => setEditingPatient(p)}>수정</button>
                                 <button className="btn-secondary" style={styles.btnDelete} onClick={() => handleDelete(p.id)}>삭제</button>
                             </div>
                         </li>
@@ -69,6 +48,13 @@ export default function WaitingList({ patients }: { patients: Patient[] }) {
                 <AssignModal
                     patient={assigningPatient}
                     onClose={() => setAssigningPatient(null)}
+                />
+            )}
+
+            {editingPatient && (
+                <PatientModal
+                    onClose={() => setEditingPatient(null)}
+                    editPatient={editingPatient}
                 />
             )}
         </div>
