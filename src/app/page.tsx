@@ -37,9 +37,25 @@ export default function Home() {
       })
       .subscribe();
 
+    // Re-fetch data when page becomes visible (mobile background → foreground)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchInitialData();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Re-fetch data when network reconnects
+    const handleOnline = () => {
+      fetchInitialData();
+    };
+    window.addEventListener('online', handleOnline);
+
     return () => {
       supabase.removeChannel(patientSub);
       supabase.removeChannel(checkSub);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
     };
   }, []);
 
