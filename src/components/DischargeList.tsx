@@ -15,6 +15,11 @@ interface Patient {
 function DCRow({ patient, onReassign }: { patient: Patient; onReassign: (p: Patient) => void }) {
     const [memo, setMemo] = useState(patient.discharge_memo || "");
     const memoRef = useRef<HTMLInputElement>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const latestMemoRef = useRef(memo);
+
+    // Keep latestMemoRef in sync
+    latestMemoRef.current = memo;
 
     useEffect(() => {
         if (document.activeElement !== memoRef.current) {
@@ -22,9 +27,55 @@ function DCRow({ patient, onReassign }: { patient: Patient; onReassign: (p: Pati
         }
     }, [patient.discharge_memo]);
 
-    const handleMemoSave = async (value: string) => {
+    // Save on beforeunload to catch page refreshes
+    useEffect(() => {
+        const handleBeforeUnload = () => {
+            if (latestMemoRef.current !== (patient.discharge_memo || "")) {
+                // Use sendBeacon for reliable save during page unload
+                const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/patients?id=eq.${patient.id}`;
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+                    'Authorization': `Bearer ${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''}`,
+                    'Prefer': 'return=minimal'
+                };
+                const body = JSON.stringify({ discharge_memo: latestMemoRef.current });
+                // Try sendBeacon first, fall back to sync XHR
+                const blob = new Blob([body], { type: 'application/json' });
+                // sendBeacon doesn't support custom headers, so use fetch with keepalive
+                fetch(url, { method: 'PATCH', headers, body, keepalive: true }).catch(() => { });
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [patient.id, patient.discharge_memo]);
+
+    const saveMemo = async (value: string) => {
         await supabase.from("patients").update({ discharge_memo: value }).eq("id", patient.id);
     };
+
+    const handleMemoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setMemo(value);
+        // Debounced auto-save
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        debounceRef.current = setTimeout(() => {
+            saveMemo(value);
+        }, 500);
+    };
+
+    const handleMemoBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+        // Cancel pending debounce and save immediately on blur
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        saveMemo(e.target.value);
+    };
+
+    // Cleanup debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+        };
+    }, []);
 
     // m.d 형식 날짜
     const dcDate = patient.discharged_at
@@ -43,9 +94,9 @@ function DCRow({ patient, onReassign }: { patient: Patient; onReassign: (p: Pati
                 <input
                     ref={memoRef}
                     value={memo}
-                    onChange={(e) => setMemo(e.target.value)}
+                    onChange={handleMemoChange}
                     placeholder="사유 입력"
-                    onBlur={(e) => handleMemoSave(e.target.value)}
+                    onBlur={handleMemoBlur}
                     style={styles.memoInput}
                 />
             </div>
@@ -163,7 +214,8 @@ const styles = {
         padding: "0.3rem 0.5rem",
         borderRadius: "4px",
         border: "1px solid var(--border-color)",
-        backgroundColor: "#fff",
+        backgroundColor: "var(--card-bg)",
+        color: "var(--text-color)",
         minWidth: 0,
     },
 };
